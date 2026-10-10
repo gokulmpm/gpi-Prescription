@@ -170,6 +170,9 @@ def build_prescription_records(merged, ps_data):
         if ps_win.empty:
             prior  = ps_sorted[ps_sorted["Time stamp"] <= slot]
             ps_win = prior.tail(1) if not prior.empty else pd.DataFrame()
+        if ps_win.empty:
+            after  = ps_sorted[ps_sorted["Time stamp"] >= window_start]
+            ps_win = after.head(1) if not after.empty else pd.DataFrame()
         if ps_win.empty and not ps_sorted.empty:
             ps_win = ps_sorted.head(1)
         ps_avg = ps_win[ps_numeric].mean().to_dict() if not ps_win.empty else {c: None for c in ps_numeric}
@@ -206,6 +209,7 @@ def run_prescription(ps_path, cons_path, comp_path):
     merged["Core Sand Lost (%)"] = merged["Core Sand Lost (%)"].fillna(20).astype(float)
     merged.loc[merged["Types of Cores"] == "No Core", "Core Sand Lost (%)"] = 20
     merged["Core Influx Sand (MT)"] = merged["Core Sand (MT)"] * ((100 - merged["Core Sand Lost (%)"]) / 100)
+    merged = merged.dropna(subset=["Start Time", "End Time"])
     merged["Start Time stamp"] = pd.to_datetime(merged["Date"].astype(str) + " " + merged["Start Time"].astype(str), format="%Y-%m-%d %H:%M")
     merged["End Time stamp"]   = pd.to_datetime(merged["Date"].astype(str) + " " + merged["End Time"].astype(str),   format="%Y-%m-%d %H:%M")
     merged["Total Boxes"]      = merged["No of Boxes"] + merged["Unpoured Moulds (Nos)"]
