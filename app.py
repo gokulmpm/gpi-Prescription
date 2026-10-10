@@ -221,6 +221,9 @@ def run_prescription(ps_path, cons_path, comp_path):
     dat["sand_metal_ratio"] = dat["Total Prepared Sand (MT)"]   / dat["Total Liquid Metal Poured (MT)"]
     dat["core_sand_ratio"]  = dat["Core Influx Sand (MT)"]       / dat["Total Prepared Sand (MT)"]
     dat["core_metal_ratio"] = dat["Core Influx Sand (MT)"]       / dat["Total Liquid Metal Poured (MT)"]
+    # Zero sand/metal in a window gives inf ratios, which break the QP solver; turn them into NaN so dropna removes them
+    ratio_cols = ["sand_metal_ratio", "core_sand_ratio", "core_metal_ratio"]
+    dat[ratio_cols] = dat[ratio_cols].replace([float("inf"), float("-inf")], float("nan"))
     dat = dat.rename(columns=config2["ps_data_column_rename"])
 
     ps_prop_cols = [c for c in config2["props_column"] if c in dat.columns]

@@ -66,8 +66,9 @@ def process_consumption_file(consumption_path, booking_path):
     df_book["Shift"] = df_book["Shift"].astype(str).str.strip().str.upper()
 
     # Consumption uses 'Component ID', Booking uses 'ComponentId'
-    df_con["Component ID"] = df_con["Component ID"].astype(str).str.strip()
-    df_book["ComponentId"] = df_book["ComponentId"].astype(str).str.strip()
+    # Booking IDs are read as floats (e.g. "51011090010.0"); strip the .0 to match consumption
+    df_con["Component ID"] = df_con["Component ID"].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    df_book["ComponentId"] = df_book["ComponentId"].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
 
     # ── Prepare booking lookup ────────────────────────────────────────────────
     # Sort booking by Date, Shift, ComponentId, StartTime.

@@ -20,10 +20,8 @@ config2 = configs.get(config1["foundry_name"]+".json")
 PRESCRIPTION_TIMES = [time(0, 0), time(8, 0), time(16, 0)]
 n        = 1500
 perShift = 450
-OFFSET   = 5
-
-
-newsand = 42
+OFFSET   = 4
+newsand = 62
 
 
 cwd=os.getcwd()
@@ -85,11 +83,11 @@ if test_data:
     merged['Core Sand Lost (%)'] = merged['Core Sand Lost (%)'].astype(float)
     merged['Core Influx Sand (MT)'] = merged['Core Sand (MT)'] * ((100 - merged['Core Sand Lost (%)']) / 100)
 
+    merged = merged.dropna(subset=["Start Time", "End Time"])
     merged["Start Time stamp"] = pd.to_datetime(merged["Date"].astype(str)+" "+merged["Start Time"].astype(str), format="%Y-%m-%d %H:%M")
     merged["End Time stamp"] = pd.to_datetime(merged["Date"].astype(str)+" "+merged["End Time"].astype(str), format="%Y-%m-%d %H:%M")
     merged["Total Boxes"] = merged["No of Boxes"]+merged["Unpoured Moulds (Nos)"]
 
-    # ── Prescription Scheduling ──────────────────────────────────────────────────
 
 
 
@@ -115,7 +113,7 @@ if test_data:
             candidate = datetime.combine(dt.date(), t)
             if candidate > dt:
                 return candidate
-        # Roll over to midnight of next day
+            
         return datetime.combine(dt.date() + timedelta(days=1), PRESCRIPTION_TIMES[0])
 
 
@@ -167,7 +165,6 @@ if test_data:
                     split["Total Boxes"] = boxes_needed
                     span = row["End Time stamp"] - row["Start Time stamp"]
 
-                    # ✅ Floor to minute to avoid nanosecond precision artifacts
                     interpolated_start = row["End Time stamp"] - span * fraction
                     split["Start Time stamp"] = interpolated_start.floor("min")
                     split["End Time stamp"]   = row["End Time stamp"]
@@ -188,23 +185,19 @@ if test_data:
 
             agg = {col: collected_df[col].sum() for col in SUM_COLS}
 
-            # ✅ Wider PS lookup: use window_start → slot
             ps_window = ps_sorted[
                 (ps_sorted["Time stamp"] >= window_start) &
                 (ps_sorted["Time stamp"] <= slot)
             ]
 
-            # ✅ Fallback 1: nearest record before slot
             if ps_window.empty:
                 prior = ps_sorted[ps_sorted["Time stamp"] <= slot]
                 ps_window = prior.tail(1) if not prior.empty else pd.DataFrame()
 
-            # ✅ Fallback 2: nearest record after window_start (data delay tolerance)
             if ps_window.empty:
                 after = ps_sorted[ps_sorted["Time stamp"] >= window_start]
                 ps_window = after.head(1) if not after.empty else pd.DataFrame()
 
-            # ✅ Fallback 3: use the single available PS record for all slots
             if ps_window.empty and not ps_sorted.empty:
                 ps_window = ps_sorted.head(1)
 
@@ -232,9 +225,6 @@ if test_data:
 
     prescription_df = build_prescription_records(merged, ps_data, n)
 
-    # Fill any NaN PS columns using global mean across ALL PS data rows.
-    # This ensures that even a single available reading (e.g. one Active Clay value)
-    # gets propagated to every prescription record.
     ps_numeric_cols_all = ps_data.select_dtypes(include="number").columns.tolist()
     ps_global_mean = ps_data[ps_numeric_cols_all].mean()
     for col in ps_numeric_cols_all:
@@ -249,6 +239,9 @@ if test_data:
     dat['sand_metal_ratio'] = dat['Total Prepared Sand (MT)'] / dat['Total Liquid Metal Poured (MT)']
     dat['core_sand_ratio'] = dat['Core Influx Sand (MT)'] / dat['Total Prepared Sand (MT)']
     dat['core_metal_ratio'] = dat['Core Influx Sand (MT)'] / dat['Total Liquid Metal Poured (MT)']
+    # Zero sand/metal in a window gives inf ratios, which break the QP solver; turn them into NaN so dropna removes them
+    ratio_cols = ['sand_metal_ratio', 'core_sand_ratio', 'core_metal_ratio']
+    dat[ratio_cols] = dat[ratio_cols].replace([float('inf'), float('-inf')], float('nan'))
     # dat[['Date', 'Shift', 'Core Influx Sand (MT)', 'SMR','CSR','CMR']].to_excel("Cons_mean.xlsx", index=False)
     exclude_cols = ['Date', 'Shift']
 
@@ -258,12 +251,9 @@ if test_data:
     dat=dat.rename(columns=config2["ps_data_column_rename"])
     test_data = dat.copy()
 
-    # Forward-fill then back-fill PS property columns so that a single
-    # available reading is propagated to all prescription windows.
     ps_prop_cols = [c for c in config2["props_column"] if c in test_data.columns]
     test_data[ps_prop_cols] = test_data[ps_prop_cols].ffill().bfill()
 
-    # Only drop rows where the required model input columns are still missing.
     required_cols = [c for c in config2["props_column"] + config2["ratio_list"] if c in test_data.columns]
     test_data.dropna(subset=required_cols, how="any", inplace=True)
 
