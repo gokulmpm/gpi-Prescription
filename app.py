@@ -10,6 +10,7 @@ from email.mime.image import MIMEImage
 from typing import List
 
 import pandas as pd
+from dotenv import load_dotenv
 from flask import Flask, request, render_template_string, jsonify
 from openpyxl import load_workbook
 from openpyxl.utils import column_index_from_string as col2idx
@@ -20,6 +21,7 @@ from consumptionTimestamp import process_consumption_file
 from preparedsandpreprocess import keep_last_value_only
 
 warnings.filterwarnings("ignore")
+load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 configs   = load_all_configs()
