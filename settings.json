@@ -1,8 +1,10 @@
 {
     "n": 1500,
     "perShift": 450,
-    "OFFSET": 4.0,
-    "newsand": 62.0,
+    "OFFSET": 5.0,
+    "newsand": 63.0,
     "email_sender": "onboarding@resend.dev",
-    "email_recipients": ["gokul@mpminfosoft.com"]
+    "email_recipients": [
+        "gokul@mpminfosoft.com"
+    ]
 }
